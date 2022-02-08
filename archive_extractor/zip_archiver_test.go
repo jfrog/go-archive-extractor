@@ -1,6 +1,8 @@
 package archive_extractor
 
 import (
+	"archive/zip"
+	"errors"
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	"strings"
@@ -12,7 +14,7 @@ func TestZipUnexpectedEofArchiver(t *testing.T) {
 	funcParams := params()
 	if err := za.ExtractArchive("./fixtures/test.deb", processingFunc, funcParams); err != nil {
 		fmt.Print(err.Error() + "\n")
-		assert.Equal(t, "zip: not a valid zip file", strings.Trim(err.Error(), ""))
+		assert.Equal(t, "No zip file found", strings.Trim(err.Error(), ""))
 	}
 }
 
@@ -92,4 +94,14 @@ func TestZipArchiverSingleFileRatioCauseError(t *testing.T) {
 	funcParams := params()
 	err := za.ExtractArchive("./fixtures/testwithsinglelargefile.zip", processingReadingFunc, funcParams)
 	assert.True(t, IsErrCompressLimitReached(err))
+}
+
+func TestZipArchiver_AppendedZip(t *testing.T) {
+	appendedZipPath := "./fixtures/appendedZip"
+	za := &ZipArchiver{}
+	funcParams := params()
+	_, err := zip.OpenReader(appendedZipPath)
+	assert.True(t, errors.Is(err, zip.ErrFormat))
+	err = za.ExtractArchive(appendedZipPath, processingFunc, funcParams)
+	assert.NoError(t, err)
 }
