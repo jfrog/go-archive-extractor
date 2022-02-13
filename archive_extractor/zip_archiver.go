@@ -10,6 +10,8 @@ import (
 	"os"
 )
 
+const fileHeaderSignatureString = "PK\x03\x04"
+
 type ZipArchiver struct {
 	MaxCompressRatio   int64
 	MaxNumberOfEntries int
@@ -77,9 +79,6 @@ func openZipReader(name string) (*ZipReadCloser, error) {
 		f.Close()
 		return nil, err
 	}
-	if _, err := f.Seek(0, io.SeekStart); err != nil {
-		return nil, fmt.Errorf("unable to seek to beginning of archive: %w", err)
-	}
 	zr := &ZipReadCloser{
 		Reader: r,
 		Closer: f,
@@ -87,7 +86,7 @@ func openZipReader(name string) (*ZipReadCloser, error) {
 	return zr, nil
 }
 
-// This method was added in order to support appended zip files.
+// This method was added in order to support prepended zip files.
 // In case we failed get a zip.Reader from r because of zip.ErrFormat error,
 // it searches for begin-of-file signature 0x04034b50 (in little-endian the value of the signature is PK0304).
 // Once the signature was found, tries to read the file starting at that offset using zip.NewReader.
@@ -105,7 +104,7 @@ func initZipReader(r io.ReaderAt, size int64) (*zip.Reader, error) {
 		}
 		n := 0
 		for {
-			m := bytes.Index(buf[n:len], []byte("PK\x03\x04"))
+			m := bytes.Index(buf[n:len], []byte(fileHeaderSignatureString))
 			if m == -1 {
 				break
 			}
