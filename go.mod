@@ -8,5 +8,5 @@ require (
 	github.com/gen2brain/go-unarr v0.1.4
 	github.com/jfrog/go-rpm/v2 v2.0.3
 	github.com/stretchr/testify v1.7.0
-	github.com/ulikunitz/xz v0.5.7
+	github.com/ulikunitz/xz v0.5.8
 )
