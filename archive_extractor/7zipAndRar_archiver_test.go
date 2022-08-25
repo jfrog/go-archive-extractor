@@ -6,8 +6,8 @@ import (
 	"testing"
 )
 
-func Test7ZipArchiver(t *testing.T) {
-	za := &SevenZipArchiver{}
+func Test7ZipAndRarArchiver(t *testing.T) {
+	za := &SevenZipAndRarArchiver{}
 	funcParams := params()
 	if err := za.ExtractArchive("./fixtures/test.7z", processingFunc, funcParams); err != nil {
 		fmt.Print(err.Error())
@@ -20,16 +20,16 @@ func Test7ZipArchiver(t *testing.T) {
 	assert.Equal(t, ad.Size, int64(44))
 }
 
-func Test7ZipArchiverReadAll(t *testing.T) {
-	za := &SevenZipArchiver{}
+func Test7ZipAndRarArchiverReadAll(t *testing.T) {
+	za := &SevenZipAndRarArchiver{}
 	funcParams := params()
 	err := za.ExtractArchive("./fixtures/testwithcontent.7z", processingReadingFunc, funcParams)
 	assert.NoError(t, err)
 	assert.Equal(t, int64(4410), funcParams["read"])
 }
 
-func Test7ZipArchiverLimitRatio(t *testing.T) {
-	za := &SevenZipArchiver{
+func Test7ZipAndRarArchiverLimitRatio(t *testing.T) {
+	za := &SevenZipAndRarArchiver{
 		MaxCompressRatio: 3,
 	}
 	funcParams := params()
@@ -37,8 +37,8 @@ func Test7ZipArchiverLimitRatio(t *testing.T) {
 	assert.True(t, IsErrCompressLimitReached(err))
 }
 
-func Test7ZipArchiverLimitRatioHighEnough(t *testing.T) {
-	za := &SevenZipArchiver{
+func Test7ZipAndRarArchiverLimitRatioHighEnough(t *testing.T) {
+	za := &SevenZipAndRarArchiver{
 		MaxCompressRatio: 4,
 	}
 	funcParams := params()
@@ -46,8 +46,8 @@ func Test7ZipArchiverLimitRatioHighEnough(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func Test7ZipArchiverLimitNumberOfRecords(t *testing.T) {
-	za := &SevenZipArchiver{
+func Test7ZipAndRarArchiverLimitNumberOfRecords(t *testing.T) {
+	za := &SevenZipAndRarArchiver{
 		MaxNumberOfEntries: 1,
 	}
 	funcParams := params()
@@ -55,8 +55,8 @@ func Test7ZipArchiverLimitNumberOfRecords(t *testing.T) {
 	assert.EqualError(t, err, ErrTooManyEntries.Error())
 }
 
-func Test7ZipArchiverLimitRatioAggregationCauseError(t *testing.T) {
-	za := &SevenZipArchiver{
+func Test7ZipAndRarArchiverLimitRatioAggregationCauseError(t *testing.T) {
+	za := &SevenZipAndRarArchiver{
 		MaxCompressRatio: 20,
 	}
 	funcParams := params()
