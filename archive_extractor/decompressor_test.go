@@ -9,15 +9,60 @@ import (
 func TestDecompressor_ExtractArchive_CompressedFile(t *testing.T) {
 	dc := &Decompressor{}
 	funcParams := params()
-	if err := dc.ExtractArchive("./fixtures/test.txt.xz", processingFunc, funcParams); err != nil {
-		fmt.Print(err.Error())
-		t.Fatal(err)
+	var testCases = []struct {
+		FilePath         string
+		ExpectedName     string
+		ExpectedModTime  int64
+		ExpectedIsFolder bool
+		ExpectedSize     int64
+	}{
+		{
+			FilePath:         "./fixtures/test.txt.xz",
+			ExpectedName:     "test.txt",
+			ExpectedModTime:  1661433804,
+			ExpectedIsFolder: false,
+			ExpectedSize:     64,
+		},
+		{
+			FilePath:         "./fixtures/test.txt.bz2",
+			ExpectedName:     "test.txt",
+			ExpectedModTime:  1661434675,
+			ExpectedIsFolder: false,
+			ExpectedSize:     43,
+		},
+		{
+			FilePath:         "./fixtures/test.txt.gz",
+			ExpectedName:     "test.txt",
+			ExpectedModTime:  1661434675,
+			ExpectedIsFolder: false,
+			ExpectedSize:     36,
+		},
+		{
+			FilePath:         "./fixtures/test.txt.lzma",
+			ExpectedName:     "test.txt",
+			ExpectedModTime:  1661434675,
+			ExpectedIsFolder: false,
+			ExpectedSize:     30,
+		},
+		{
+			FilePath:         "./fixtures/test.txt.Z",
+			ExpectedName:     "test.txt",
+			ExpectedModTime:  1661434675,
+			ExpectedIsFolder: false,
+			ExpectedSize:     11,
+		},
 	}
-	ad := funcParams["archiveData"].(*ArchiveData)
-	assert.Equal(t, ad.Name, "test.txt")
-	assert.Equal(t, ad.ModTime, int64(1661433804))
-	assert.Equal(t, ad.IsFolder, false)
-	assert.Equal(t, ad.Size, int64(64))
+	for _, tc := range testCases {
+		if err := dc.ExtractArchive(tc.FilePath, processingFunc, funcParams); err != nil {
+			fmt.Print(err.Error())
+			t.Fatal(err)
+		}
+		ad := funcParams["archiveData"].(*ArchiveData)
+		assert.Equal(t, ad.Name, tc.ExpectedName)
+		assert.Equal(t, ad.ModTime, tc.ExpectedModTime)
+		assert.Equal(t, ad.IsFolder, tc.ExpectedIsFolder)
+		assert.Equal(t, ad.Size, tc.ExpectedSize)
+	}
 }
 
 func TestDecompressor_ExtractArchive_NotCompressedFile(t *testing.T) {
