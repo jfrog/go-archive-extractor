@@ -1,7 +1,7 @@
 package archive_extractor
 
 import (
-	"errors"
+	"fmt"
 	"github.com/jfrog/go-archive-extractor/archive_extractor/archiver_errors"
 	"github.com/jfrog/go-archive-extractor/compression"
 	"os"
@@ -24,14 +24,11 @@ func (dc Decompressor) ExtractArchive(path string,
 		Limit: maxBytesLimit,
 	}
 	cReader, isCompressed, err := compression.NewReader(path)
-	if compression.IsGetReaderError(err) {
+	if err != nil {
 		return archiver_errors.New(err)
 	}
-	if err != nil {
-		return err
-	}
 	if !isCompressed {
-		return errors.New("file is not compressed or the compression method is not supported")
+		return fmt.Errorf("file %v is not compressed or the compression method is not supported", path)
 	}
 	defer cReader.Close()
 	limitingReader := provider.CreateLimitAggregatingReadCloser(cReader)

@@ -26,21 +26,21 @@ func TestDecompressor_ExtractArchive_CompressedFile(t *testing.T) {
 		{
 			FilePath:         "./fixtures/test.txt.bz2",
 			ExpectedName:     "test.txt",
-			ExpectedModTime:  1661434675,
+			ExpectedModTime:  1661837894,
 			ExpectedIsFolder: false,
 			ExpectedSize:     43,
 		},
 		{
 			FilePath:         "./fixtures/test.txt.gz",
 			ExpectedName:     "test.txt",
-			ExpectedModTime:  1661434675,
+			ExpectedModTime:  1661837894,
 			ExpectedIsFolder: false,
 			ExpectedSize:     36,
 		},
 		{
 			FilePath:         "./fixtures/test.txt.lzma",
 			ExpectedName:     "test.txt",
-			ExpectedModTime:  1661434675,
+			ExpectedModTime:  1661837894,
 			ExpectedIsFolder: false,
 			ExpectedSize:     30,
 		},
@@ -57,7 +57,8 @@ func TestDecompressor_ExtractArchive_CompressedFile(t *testing.T) {
 			fmt.Print(err.Error())
 			t.Fatal(err)
 		}
-		ad := funcParams["archiveData"].(*ArchiveData)
+		ad, ok := funcParams["archiveData"].(*ArchiveData)
+		assert.True(t, ok)
 		assert.Equal(t, ad.Name, tc.ExpectedName)
 		assert.Equal(t, ad.ModTime, tc.ExpectedModTime)
 		assert.Equal(t, ad.IsFolder, tc.ExpectedIsFolder)
@@ -69,7 +70,7 @@ func TestDecompressor_ExtractArchive_NotCompressedFile(t *testing.T) {
 	dc := &Decompressor{}
 	funcParams := params()
 	err := dc.ExtractArchive("./fixtures/test.txt", processingFunc, funcParams)
-	assert.Error(t, err, "file is not compressed or the compression method is not supported")
+	assert.EqualError(t, err, "file ./fixtures/test.txt is not compressed or the compression method is not supported")
 }
 
 func TestDecompressorMaxRatio(t *testing.T) {
