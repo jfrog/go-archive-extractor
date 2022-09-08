@@ -14,11 +14,15 @@ type Decompressor struct {
 	MaxNumberOfEntries int
 }
 
+const (
+	NotCompressedOrNotSupportedError = "file %v is not compressed or the compression method is not supported"
+)
+
 func (dc Decompressor) ExtractArchive(path string,
 	processingFunc func(*ArchiveHeader, map[string]interface{}) error, params map[string]interface{}) error {
 	maxBytesLimit, err := maxBytesLimit(path, dc.MaxCompressRatio)
 	if err != nil {
-		return err
+		return archiver_errors.New(err)
 	}
 	provider := LimitAggregatingReadCloserProvider{
 		Limit: maxBytesLimit,
@@ -28,16 +32,19 @@ func (dc Decompressor) ExtractArchive(path string,
 		return archiver_errors.New(err)
 	}
 	if !isCompressed {
-		return fmt.Errorf("file %v is not compressed or the compression method is not supported", path)
+		return archiver_errors.New(fmt.Errorf(NotCompressedOrNotSupportedError, path))
 	}
 	defer cReader.Close()
 	limitingReader := provider.CreateLimitAggregatingReadCloser(cReader)
 	defer limitingReader.Close()
 	f, err := os.Open(path)
+	if err != nil {
+		return archiver_errors.New(err)
+	}
 	defer f.Close()
 	fInfo, err := f.Stat()
 	if err != nil {
-		return err
+		return archiver_errors.New(err)
 	}
 	// removing the compression extension since now we have a decompressed file
 	name := strings.TrimSuffix(fInfo.Name(), filepath.Ext(fInfo.Name()))

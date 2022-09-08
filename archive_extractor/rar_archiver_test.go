@@ -1,20 +1,18 @@
 package archive_extractor
 
 import (
-	"fmt"
 	"github.com/stretchr/testify/assert"
-	"strings"
+	"github.com/stretchr/testify/require"
 	"testing"
 )
 
 func TestRarArchiver(t *testing.T) {
 	ra := &RarArchiver{}
 	funcParams := params()
-	if err := ra.ExtractArchive("./fixtures/test.rar", processingFunc, funcParams); err != nil {
-		fmt.Print(err.Error())
-		t.Fatal(err)
-	}
-	ad := funcParams["archiveData"].(*ArchiveData)
+	err := ra.ExtractArchive("./fixtures/test.rar", processingFunc, funcParams)
+	require.NoError(t, err)
+	ad, ok := funcParams["archiveData"].(*ArchiveData)
+	assert.True(t, ok)
 	assert.Equal(t, ad.Name, "Interactive travel sample/media/Maldives.jpg")
 	assert.Equal(t, ad.ModTime, int64(1454061977))
 	assert.Equal(t, ad.IsFolder, false)
@@ -25,13 +23,12 @@ func TestRarArchiver_NoRarFile(t *testing.T) {
 	// zip file with .rar extension (changed manually)
 	ra := &RarArchiver{}
 	funcParams := params()
-	if err := ra.ExtractArchive("./fixtures/notRarFile.rar", processingFunc, funcParams); err != nil {
-		fmt.Print(err.Error() + "\n")
-		assert.Equal(t, "rardecode: RAR signature not found", strings.Trim(err.Error(), ""))
-	}
+	err := ra.ExtractArchive("./fixtures/notRarFile.rar", processingFunc, funcParams)
+	assert.Error(t, err)
+	assert.Equal(t, err.Error(), "rardecode: RAR signature not found")
 }
 
-func TestRarArchiverReadAll(t *testing.T) {
+func TestRarArchiver_ExtractArchive(t *testing.T) {
 	ra := &RarArchiver{}
 	funcParams := params()
 	err := ra.ExtractArchive("./fixtures/testwithcontent.rar", processingReadingFunc, funcParams)
