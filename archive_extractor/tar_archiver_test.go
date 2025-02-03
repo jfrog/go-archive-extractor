@@ -1,6 +1,7 @@
 package archive_extractor
 
 import (
+	"context"
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -11,7 +12,7 @@ import (
 func TestTarUnexpectedEofArchiver(t *testing.T) {
 	za := &TarArchiver{}
 	funcParams := params()
-	if err := za.ExtractArchive("./fixtures/test.deb", processingFunc, funcParams); err != nil {
+	if err := za.ExtractArchive(context.Background(), "./fixtures/test.deb", processingFunc, funcParams); err != nil {
 		fmt.Print(err.Error() + "\n")
 		assert.Equal(t, "archive/tar: invalid tar header", strings.Trim(err.Error(), ""))
 	}
@@ -20,7 +21,7 @@ func TestTarUnexpectedEofArchiver(t *testing.T) {
 func TestTarArchiver(t *testing.T) {
 	za := &TarArchiver{}
 	funcParams := params()
-	if err := za.ExtractArchive("./fixtures/test.tar.gz", processingFunc, funcParams); err != nil {
+	if err := za.ExtractArchive(context.Background(), "./fixtures/test.tar.gz", processingFunc, funcParams); err != nil {
 		fmt.Print(err.Error())
 		t.Fatal(err)
 	}
@@ -34,7 +35,7 @@ func TestTarArchiver(t *testing.T) {
 func TestTarArchiver_Lzma(t *testing.T) {
 	za := &TarArchiver{}
 	funcParams := params()
-	if err := za.ExtractArchive("./fixtures/junit.tar.lzma", processingFunc, funcParams); err != nil {
+	if err := za.ExtractArchive(context.Background(), "./fixtures/junit.tar.lzma", processingFunc, funcParams); err != nil {
 		fmt.Print(err.Error())
 		t.Fatal(err)
 	}
@@ -50,7 +51,7 @@ func TestTarArchiverMaxRatio(t *testing.T) {
 		MaxCompressRatio: 2,
 	}
 	funcParams := params()
-	err := za.ExtractArchive("./fixtures/testsinglelarge.tar.gz", processingReadingFunc, funcParams)
+	err := za.ExtractArchive(context.Background(), "./fixtures/testsinglelarge.tar.gz", processingReadingFunc, funcParams)
 	assert.True(t, IsErrCompressLimitReached(err))
 }
 
@@ -59,7 +60,7 @@ func TestTarArchiverMaxRatioNotReached(t *testing.T) {
 		MaxCompressRatio: 100,
 	}
 	funcParams := params()
-	err := za.ExtractArchive("./fixtures/testsinglelarge.tar.gz", processingReadingFunc, funcParams)
+	err := za.ExtractArchive(context.Background(), "./fixtures/testsinglelarge.tar.gz", processingReadingFunc, funcParams)
 	assert.NoError(t, err)
 }
 
@@ -68,7 +69,7 @@ func TestTarArchiverMaxEntriesReached(t *testing.T) {
 		MaxNumberOfEntries: 12,
 	}
 	funcParams := params()
-	err := za.ExtractArchive("./fixtures/testmanylarge.tar.gz", processingReadingFunc, funcParams)
+	err := za.ExtractArchive(context.Background(), "./fixtures/testmanylarge.tar.gz", processingReadingFunc, funcParams)
 	assert.EqualError(t, err, ErrTooManyEntries.Error())
 }
 
@@ -77,7 +78,7 @@ func TestTarArchiverMaxEntriesNotReached(t *testing.T) {
 		MaxNumberOfEntries: 20,
 	}
 	funcParams := params()
-	err := za.ExtractArchive("./fixtures/testmanylarge.tar.gz", processingReadingFunc, funcParams)
+	err := za.ExtractArchive(context.Background(), "./fixtures/testmanylarge.tar.gz", processingReadingFunc, funcParams)
 	assert.NoError(t, err)
 }
 
@@ -86,6 +87,6 @@ func TestTarArchiverAggregationCauseRatioLimitError(t *testing.T) {
 		MaxCompressRatio: 4,
 	}
 	funcParams := params()
-	err := za.ExtractArchive("./fixtures/testmanylarge.tar.gz", processingReadingFunc, funcParams)
+	err := za.ExtractArchive(context.Background(), "./fixtures/testmanylarge.tar.gz", processingReadingFunc, funcParams)
 	assert.True(t, IsErrCompressLimitReached(err))
 }

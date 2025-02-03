@@ -3,6 +3,7 @@ package archive_extractor
 import (
 	"archive/zip"
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"github.com/jfrog/go-archive-extractor/archive_extractor/archiver_errors"
@@ -30,8 +31,8 @@ type ZipReadCloser struct {
 	io.Closer
 }
 
-func (za ZipArchiver) ExtractArchive(path string,
-	processingFunc func(*ArchiveHeader, map[string]interface{}) error, params map[string]interface{}) error {
+func (za ZipArchiver) ExtractArchive(ctx context.Context, path string,
+	processingFunc func(context.Context, *ArchiveHeader, map[string]interface{}) error, params map[string]interface{}) error {
 	maxBytesLimit, err := maxBytesLimit(path, za.MaxCompressRatio)
 	if err != nil {
 		return err
@@ -56,8 +57,8 @@ func (za ZipArchiver) ExtractArchive(path string,
 			continue
 		}
 		countingReadCloser := rcProvider.CreateLimitAggregatingReadCloser(rc)
-		archiveHeader := NewArchiveHeader(countingReadCloser, archiveEntry.Name, archiveEntry.ModTime().Unix(), archiveEntry.FileInfo().Size())
-		err = processingFunc(archiveHeader, params)
+		archiveHeader := NewArchiveHeader(countingReadCloser, archiveEntry.Name, archiveEntry.Modified.Unix(), archiveEntry.FileInfo().Size())
+		err = processingFunc(ctx, archiveHeader, params)
 		if err != nil {
 			if rc != nil {
 				rc.Close()

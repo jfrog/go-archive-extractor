@@ -1,13 +1,14 @@
 package archive_extractor
 
 import (
+	"context"
 	"github.com/jfrog/go-archive-extractor/utils"
 	"io"
 	"os"
 )
 
 type Archiver interface {
-	ExtractArchive(path string, processingFunc func(header *ArchiveHeader, params map[string]interface{}) error, params map[string]interface{}) error
+	ExtractArchive(ctx context.Context, path string, processingFunc func(ctx context.Context, header *ArchiveHeader, params map[string]interface{}) error, params map[string]interface{}) error
 }
 
 type ArchiveHeader struct {
@@ -16,6 +17,7 @@ type ArchiveHeader struct {
 	Name          string
 	ModTime       int64
 	Size          int64
+	LinkName      string
 }
 
 func NewArchiveHeader(archiveReader io.Reader, name string, modTime int64, size int64) *ArchiveHeader {
@@ -27,6 +29,9 @@ func maxBytesLimit(path string, maxCompressRation int64) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
+	defer func() {
+		_ = f.Close()
+	}()
 	fi, err := f.Stat()
 	if err != nil {
 		return 0, err

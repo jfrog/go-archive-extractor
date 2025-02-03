@@ -1,6 +1,7 @@
 package archive_extractor
 
 import (
+	"context"
 	"github.com/jfrog/go-archive-extractor/archive_extractor/archiver_errors"
 	"github.com/jfrog/go-archive-extractor/utils"
 	"github.com/mholt/archiver/v3"
@@ -12,8 +13,8 @@ type RarArchiver struct {
 	MaxNumberOfEntries int
 }
 
-func (ra RarArchiver) ExtractArchive(path string,
-	processingFunc func(*ArchiveHeader, map[string]interface{}) error, params map[string]interface{}) error {
+func (ra RarArchiver) ExtractArchive(ctx context.Context, path string,
+	processingFunc func(context.Context, *ArchiveHeader, map[string]interface{}) error, params map[string]interface{}) error {
 	maxBytesLimit, err := maxBytesLimit(path, ra.MaxCompressRatio)
 	if err != nil {
 		return archiver_errors.New(err)
@@ -43,7 +44,7 @@ func (ra RarArchiver) ExtractArchive(path string,
 		if !file.FileInfo.IsDir() && !utils.PlaceHolderFolder(file.FileInfo.Name()) {
 			countingReadCloser := provider.CreateLimitAggregatingReadCloser(file.ReadCloser)
 			archiveHeader := NewArchiveHeader(countingReadCloser, file.FileInfo.Name(), file.FileInfo.ModTime().Unix(), file.FileInfo.Size())
-			err = processingFunc(archiveHeader, params)
+			err = processingFunc(ctx, archiveHeader, params)
 			if err != nil {
 				return err
 			}

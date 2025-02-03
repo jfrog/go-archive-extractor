@@ -1,6 +1,7 @@
 package archive_extractor
 
 import (
+	"context"
 	"fmt"
 	"github.com/jfrog/go-archive-extractor/archive_extractor/archiver_errors"
 	"github.com/stretchr/testify/assert"
@@ -70,7 +71,7 @@ func TestDecompressor_ExtractArchive_CompressedFile(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
-			err := dc.ExtractArchive(tc.FilePath, processingFunc, funcParams)
+			err := dc.ExtractArchive(context.Background(), tc.FilePath, processingFunc, funcParams)
 			require.NoError(t, err)
 			ad, ok := funcParams["archiveData"].(*ArchiveData)
 			assert.True(t, ok)
@@ -87,7 +88,7 @@ func TestDecompressor_ExtractArchive_NotCompressedFile(t *testing.T) {
 	funcParams := params()
 	filePath := "./fixtures/test.txt"
 	expectedErr := archiver_errors.New(fmt.Errorf(NotCompressedOrNotSupportedError, filePath))
-	err := dc.ExtractArchive(filePath, processingFunc, funcParams)
+	err := dc.ExtractArchive(context.Background(), filePath, processingFunc, funcParams)
 	assert.EqualError(t, err, expectedErr.Error())
 }
 
@@ -96,7 +97,7 @@ func TestExtractArchive_MaxRatioReached_ShouldReturnError(t *testing.T) {
 		MaxCompressRatio: 2,
 	}
 	funcParams := params()
-	err := dc.ExtractArchive("./fixtures/testsinglelarge.txt.xz", processingReadingFunc, funcParams)
+	err := dc.ExtractArchive(context.Background(), "./fixtures/testsinglelarge.txt.xz", processingReadingFunc, funcParams)
 	assert.True(t, IsErrCompressLimitReached(err))
 }
 
@@ -105,6 +106,6 @@ func TestExtractArchive_MaxRatioNotReached(t *testing.T) {
 		MaxCompressRatio: 100,
 	}
 	funcParams := params()
-	err := dc.ExtractArchive("./fixtures/testsinglelarge.txt.xz", processingReadingFunc, funcParams)
+	err := dc.ExtractArchive(context.Background(), "./fixtures/testsinglelarge.txt.xz", processingReadingFunc, funcParams)
 	assert.NoError(t, err)
 }

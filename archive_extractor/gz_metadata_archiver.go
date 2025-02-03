@@ -1,6 +1,7 @@
 package archive_extractor
 
 import (
+	"context"
 	"github.com/jfrog/go-archive-extractor/archive_extractor/archiver_errors"
 	"github.com/jfrog/go-archive-extractor/compression"
 	"time"
@@ -10,8 +11,8 @@ type GzMetadataArchiver struct {
 	MaxCompressRatio int64
 }
 
-func (ga GzMetadataArchiver) ExtractArchive(path string,
-	processingFunc func(*ArchiveHeader, map[string]interface{}) error, params map[string]interface{}) error {
+func (ga GzMetadataArchiver) ExtractArchive(ctx context.Context, path string,
+	processingFunc func(context.Context, *ArchiveHeader, map[string]interface{}) error, params map[string]interface{}) error {
 
 	maxBytesLimit, err := maxBytesLimit(path, ga.MaxCompressRatio)
 	if err != nil {
@@ -30,7 +31,7 @@ func (ga GzMetadataArchiver) ExtractArchive(path string,
 	countingReadCloser := provider.CreateLimitAggregatingReadCloser(cReader)
 	defer countingReadCloser.Close()
 	archiveHeader := NewArchiveHeader(countingReadCloser, "metadata", time.Now().Unix(), 0)
-	err = processingFunc(archiveHeader, params)
+	err = processingFunc(ctx, archiveHeader, params)
 	if err != nil {
 		return err
 	}

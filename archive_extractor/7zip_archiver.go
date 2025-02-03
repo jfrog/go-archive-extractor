@@ -1,6 +1,7 @@
 package archive_extractor
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	archive "github.com/gen2brain/go-unarr"
@@ -13,8 +14,8 @@ type SevenZipArchiver struct {
 	MaxNumberOfEntries int
 }
 
-func (sa SevenZipArchiver) ExtractArchive(path string,
-	processingFunc func(*ArchiveHeader, map[string]interface{}) error, params map[string]interface{}) error {
+func (sa SevenZipArchiver) ExtractArchive(ctx context.Context, path string,
+	processingFunc func(context.Context, *ArchiveHeader, map[string]interface{}) error, params map[string]interface{}) error {
 	maxBytesLimit, err := maxBytesLimit(path, sa.MaxCompressRatio)
 	if err != nil {
 		return err
@@ -44,7 +45,7 @@ func (sa SevenZipArchiver) ExtractArchive(path string,
 			rc := &SevenZipReader{Archive: r, Size: r.Size()}
 			countingReadCloser := provider.CreateLimitAggregatingReadCloser(rc)
 			archiveHeader := NewArchiveHeader(countingReadCloser, r.Name(), r.ModTime().Unix(), int64(r.Size()))
-			err = processingFunc(archiveHeader, params)
+			err = processingFunc(ctx, archiveHeader, params)
 			rc.Close()
 			if err != nil {
 				return err

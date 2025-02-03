@@ -1,6 +1,7 @@
 package archive_extractor
 
 import (
+	"context"
 	"fmt"
 	"github.com/jfrog/go-archive-extractor/archive_extractor/archiver_errors"
 	"github.com/stretchr/testify/assert"
@@ -10,7 +11,7 @@ import (
 func TestRpmArchiver(t *testing.T) {
 	za := &RpmArchiver{}
 	funcParams := params()
-	if err := za.ExtractArchive("./fixtures/test.rpm", processingFunc, funcParams); err != nil {
+	if err := za.ExtractArchive(context.Background(), "./fixtures/test.rpm", processingFunc, funcParams); err != nil {
 		fmt.Print(err.Error())
 		t.Fatal(err)
 	}
@@ -30,7 +31,7 @@ func TestRpmArchiverTooManyEntries(t *testing.T) {
 	za := &RpmArchiver{
 		MaxNumberOfEntries: 1,
 	}
-	err := za.ExtractArchive("./fixtures/test.rpm", processingFunc, params())
+	err := za.ExtractArchive(context.Background(), "./fixtures/test.rpm", processingFunc, params())
 	assert.EqualError(t, err, archiver_errors.New(ErrTooManyEntries).Error())
 }
 
@@ -38,7 +39,7 @@ func TestRpmArchiverTooManyEntriesNotReached(t *testing.T) {
 	za := &RpmArchiver{
 		MaxNumberOfEntries: 100,
 	}
-	err := za.ExtractArchive("./fixtures/test.rpm", processingFunc, params())
+	err := za.ExtractArchive(context.Background(), "./fixtures/test.rpm", processingFunc, params())
 	assert.NoError(t, err)
 }
 
@@ -46,6 +47,6 @@ func TestRpmArchiverRatioOk(t *testing.T) {
 	za := &RpmArchiver{
 		MaxCompressRatio: 1,
 	}
-	err := za.ExtractArchive("./fixtures/test.rpm", processingFunc, params())
+	err := za.ExtractArchive(context.Background(), "./fixtures/test.rpm", processingFunc, params())
 	assert.NoError(t, err)
 }

@@ -38,8 +38,6 @@ For multi-platform cross-compile builds:
 goreleaser --snapshot --skip-publish --rm-dist
 ```
 
-See `build.sh` for **gcc toolchain** information and for manual cross-platform build instructions.
-
 ## Library Examples
 
 #### Install Library
@@ -134,7 +132,7 @@ for {
 #### Extract contents of archive to destination path
 
 ```go
-err := a.Extract("/tmp/path")
+_, err := a.Extract("/tmp/path")
 if err != nil {
     panic(err)
 }
