@@ -1,6 +1,7 @@
 package archive_extractor
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/blakesmith/ar"
@@ -17,8 +18,8 @@ type DebArchiver struct {
 
 const DebArchiverSkipFoldersCheckParamsKey = "DebArchiverSkipFoldersCheckParamsKey"
 
-func (da DebArchiver) ExtractArchive(path string,
-	processingFunc func(*ArchiveHeader, map[string]interface{}) error, params map[string]interface{}) error {
+func (da DebArchiver) ExtractArchive(ctx context.Context, path string,
+	processingFunc func(context.Context, *ArchiveHeader, map[string]interface{}) error, params map[string]interface{}) error {
 	maxBytesLimit, err := maxBytesLimit(path, da.MaxCompressRatio)
 	if err != nil {
 		return err
@@ -55,7 +56,7 @@ func (da DebArchiver) ExtractArchive(path string,
 		if skipFolderCheck(params) || !utils.IsFolder(archiveEntry.Name) {
 			limitingReader := provider.CreateLimitAggregatingReadCloser(rc)
 			archiveHeader := NewArchiveHeader(limitingReader, archiveEntry.Name, archiveEntry.ModTime.Unix(), archiveEntry.Size)
-			err = processingFunc(archiveHeader, params)
+			err = processingFunc(ctx, archiveHeader, params)
 			if err != nil {
 				return err
 			}

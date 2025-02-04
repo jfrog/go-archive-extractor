@@ -12,6 +12,7 @@ require (
 	github.com/kr/pretty v0.3.0 // indirect
 	github.com/mholt/archiver/v3 v3.5.1
 	github.com/nwaples/rardecode v1.1.3 // indirect
+	github.com/palantir/stacktrace v0.0.0-20161112013806-78658fd2d177
 	github.com/stretchr/testify v1.7.0
 	github.com/ulikunitz/xz v0.5.10
 )

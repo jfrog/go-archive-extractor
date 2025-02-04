@@ -1,6 +1,7 @@
 package archive_extractor
 
 import (
+	"context"
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -9,7 +10,7 @@ import (
 func Test7ZipAndRarArchiver(t *testing.T) {
 	za := &SevenZipArchiver{}
 	funcParams := params()
-	if err := za.ExtractArchive("./fixtures/test.7z", processingFunc, funcParams); err != nil {
+	if err := za.ExtractArchive(context.Background(), "./fixtures/test.7z", processingFunc, funcParams); err != nil {
 		fmt.Print(err.Error())
 		t.Fatal(err)
 	}
@@ -23,7 +24,7 @@ func Test7ZipAndRarArchiver(t *testing.T) {
 func Test7ZipAndRarArchiverReadAll(t *testing.T) {
 	za := &SevenZipArchiver{}
 	funcParams := params()
-	err := za.ExtractArchive("./fixtures/testwithcontent.7z", processingReadingFunc, funcParams)
+	err := za.ExtractArchive(context.Background(), "./fixtures/testwithcontent.7z", processingReadingFunc, funcParams)
 	assert.NoError(t, err)
 	assert.Equal(t, int64(4410), funcParams["read"])
 }
@@ -33,7 +34,7 @@ func Test7ZipAndRarArchiverLimitRatio(t *testing.T) {
 		MaxCompressRatio: 3,
 	}
 	funcParams := params()
-	err := za.ExtractArchive("./fixtures/testwithcontent.7z", processingReadingFunc, funcParams)
+	err := za.ExtractArchive(context.Background(), "./fixtures/testwithcontent.7z", processingReadingFunc, funcParams)
 	assert.True(t, IsErrCompressLimitReached(err))
 }
 
@@ -42,7 +43,7 @@ func Test7ZipAndRarArchiverLimitRatioHighEnough(t *testing.T) {
 		MaxCompressRatio: 4,
 	}
 	funcParams := params()
-	err := za.ExtractArchive("./fixtures/testwithcontent.7z", processingReadingFunc, funcParams)
+	err := za.ExtractArchive(context.Background(), "./fixtures/testwithcontent.7z", processingReadingFunc, funcParams)
 	assert.NoError(t, err)
 }
 
@@ -51,7 +52,7 @@ func Test7ZipAndRarArchiverLimitNumberOfRecords(t *testing.T) {
 		MaxNumberOfEntries: 1,
 	}
 	funcParams := params()
-	err := za.ExtractArchive("./fixtures/testwithmultipleentries.7z", processingReadingFunc, funcParams)
+	err := za.ExtractArchive(context.Background(), "./fixtures/testwithmultipleentries.7z", processingReadingFunc, funcParams)
 	assert.EqualError(t, err, ErrTooManyEntries.Error())
 }
 
@@ -60,6 +61,6 @@ func Test7ZipAndRarArchiverLimitRatioAggregationCauseError(t *testing.T) {
 		MaxCompressRatio: 20,
 	}
 	funcParams := params()
-	err := za.ExtractArchive("./fixtures/testwithmultiplelargeentries.7z", processingReadingFunc, funcParams)
+	err := za.ExtractArchive(context.Background(), "./fixtures/testwithmultiplelargeentries.7z", processingReadingFunc, funcParams)
 	assert.True(t, IsErrCompressLimitReached(err))
 }

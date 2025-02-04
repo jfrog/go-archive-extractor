@@ -1,6 +1,7 @@
 package archive_extractor
 
 import (
+	"context"
 	"github.com/cavaliercoder/go-cpio"
 	"github.com/jfrog/go-archive-extractor/archive_extractor/archiver_errors"
 	"github.com/jfrog/go-archive-extractor/compression"
@@ -14,8 +15,8 @@ type RpmArchiver struct {
 	MaxNumberOfEntries int
 }
 
-func (ra RpmArchiver) ExtractArchive(path string,
-	processingFunc func(*ArchiveHeader, map[string]interface{}) error, params map[string]interface{}) error {
+func (ra RpmArchiver) ExtractArchive(ctx context.Context, path string,
+	processingFunc func(context.Context, *ArchiveHeader, map[string]interface{}) error, params map[string]interface{}) error {
 	maxBytesLimit, err := maxBytesLimit(path, ra.MaxCompressRatio)
 	rpmFile, err := rpm.OpenPackageFile(path)
 	if compression.IsGetReaderError(err) {
@@ -32,7 +33,7 @@ func (ra RpmArchiver) ExtractArchive(path string,
 	}
 	defer cReader.Close()
 
-	err = ra.readRpm(processingFunc, params, rpmFile, cReader, maxBytesLimit)
+	err = ra.readRpm(ctx, processingFunc, params, rpmFile, cReader, maxBytesLimit)
 	if err != nil && !IsErrCompressLimitReached(err) {
 		return archiver_errors.New(err)
 	}
@@ -60,7 +61,7 @@ func (ra RpmArchiver) getHeadersEnd(headers []rpm.Header) int64 {
 	return int64(end)
 }
 
-func (ra RpmArchiver) readRpm(processingFunc func(*ArchiveHeader, map[string]interface{}) error,
+func (ra RpmArchiver) readRpm(ctx context.Context, processingFunc func(context.Context, *ArchiveHeader, map[string]interface{}) error,
 	params map[string]interface{}, rpmFile *rpm.PackageFile, fileReader io.Reader, maxBytesLimit int64) error {
 	provider := LimitAggregatingReadCloserProvider{
 		Limit: maxBytesLimit,
@@ -84,7 +85,7 @@ func (ra RpmArchiver) readRpm(processingFunc func(*ArchiveHeader, map[string]int
 		count++
 		if archiveEntry != nil && !archiveEntry.Mode.IsDir() {
 			archiveHeader := NewArchiveHeader(rc, archiveEntry.Name, archiveEntry.ModTime.Unix(), archiveEntry.Size)
-			err = processingFunc(archiveHeader, params)
+			err = processingFunc(ctx, archiveHeader, params)
 			if _, ok := params["rpmPkg"]; !ok {
 				modularityLabel := getModularityLabel(rpmFile)
 				params["rpmPkg"] = &RpmPkg{Name: rpmFile.Name(), Version: rpmFile.Version(), Release: rpmFile.Release(),

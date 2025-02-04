@@ -29,7 +29,8 @@ const (
 	txzExt   = ".txz"
 	lzmaExt  = ".lzma"
 	tlzmaExt = ".tlzma"
-	zstdExt  = ".zst"
+	zstExt   = ".zst"
+	zstdExt  = ".zstd"
 
 	maxMagicBytes = 6 // 6 is the biggest used here (xz)
 )
@@ -119,7 +120,7 @@ func newReader(fa *fileArgs) (reader io.ReadCloser, isCompressed bool, err error
 	case lzmaExt, tlzmaExt:
 		reader, err = initReader(fa, lzmaReader)
 		return
-	case zstdExt:
+	case zstExt, zstdExt:
 		reader, err = initReader(fa, zstdReader)
 		return
 	default:

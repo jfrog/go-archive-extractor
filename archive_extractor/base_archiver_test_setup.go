@@ -1,6 +1,7 @@
 package archive_extractor
 
 import (
+	"context"
 	"errors"
 	"io"
 )
@@ -19,7 +20,7 @@ func params() map[string]interface{} {
 	}
 }
 
-func processingFunc(header *ArchiveHeader, params map[string]interface{}) error {
+func processingFunc(_ context.Context, header *ArchiveHeader, params map[string]interface{}) error {
 	if len(params) == 0 {
 		return errors.New("Advance processing params are missing")
 	}
@@ -36,7 +37,7 @@ func processingFunc(header *ArchiveHeader, params map[string]interface{}) error 
 	return nil
 }
 
-func processingReadingFunc(header *ArchiveHeader, params map[string]interface{}) error {
+func processingReadingFunc(_ context.Context, header *ArchiveHeader, params map[string]interface{}) error {
 	n, err := io.Copy(io.Discard, header.ArchiveReader)
 	params["read"] = n
 	return err
