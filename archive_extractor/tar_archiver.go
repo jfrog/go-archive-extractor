@@ -3,8 +3,10 @@ package archive_extractor
 import (
 	"context"
 	"io/fs"
+	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/jfrog/go-archive-extractor/archive_extractor/archiver_errors"
 	"github.com/jfrog/go-archive-extractor/utils"
@@ -16,71 +18,106 @@ type TarArchiver struct {
 	MaxNumberOfEntries int
 }
 
-func (ta TarArchiver) ExtractArchive(path string,
-	processingFunc func(*ArchiveHeader, map[string]interface{}) error, params map[string]interface{}) error {
-	ctx := context.Background()
+func (ta TarArchiver) ExtractArchive(path string, processingFunc func(*ArchiveHeader, map[string]interface{}) error, params map[string]interface{}) error {
 
-	fileSystem, err := archives.FileSystem(ctx, path, nil)
+	ctx := context.Background()
+	maxBytesLimit, err := maxBytesLimit(path, ta.MaxCompressRatio)
 	if err != nil {
-		return archiver_errors.NewOpenError(path, err)
+		return archiver_errors.New(err)
 	}
 
-	provider, err := ta.getProvider(path)
+	if err = ta.checkSpaceAvailability(ctx, path, maxBytesLimit); err != nil {
+		return archiver_errors.New(err)
+	}
+
+	fsys, err := archives.FileSystem(ctx, path, nil)
 	if err != nil {
 		return archiver_errors.New(err)
 	}
 
 	symlinks := make(map[string][]string)
 
-	err = resolveSymlinks(fileSystem, symlinks)
-	if err != nil {
-		return archiver_errors.NewProcessError(path, err)
+	if err = resolveSymlinks(fsys, symlinks); err != nil {
+		return archiver_errors.NewOpenError(path, err)
 	}
 
-	err = processArchive(*provider, fileSystem, symlinks, processingFunc, params)
-	if err != nil {
-		return archiver_errors.NewProcessError(path, err)
+	provider := LimitAggregatingReadCloserProvider{
+		Limit: maxBytesLimit,
+	}
+
+	if err = processArchive(fsys, symlinks, provider, processingFunc, params); err != nil {
+		return archiver_errors.NewOpenError(path, err)
 	}
 
 	return nil
 }
 
-func (ta TarArchiver) getProvider(path string) (*LimitAggregatingReadCloserProvider, error) {
-	maxBytesLimit, err := maxBytesLimit(path, ta.MaxCompressRatio)
+func (ta TarArchiver) checkSpaceAvailability(ctx context.Context, path string, maxBytesLimit int64) error {
+	var stat syscall.Statfs_t
+	if err := syscall.Statfs(path, &stat); err != nil {
+		return archiver_errors.New(err)
+	}
+	if stat.Bavail >= uint64(maxBytesLimit) {
+		return nil
+	}
+
+	format, _, err := archives.Identify(ctx, path, nil)
 	if err != nil {
-		return nil, err
+		return archiver_errors.New(err)
 	}
-	provider := &LimitAggregatingReadCloserProvider{
-		Limit: maxBytesLimit,
+
+	tarFile, err := os.Open(path)
+	if err != nil {
+		return archiver_errors.NewOpenError(path, err)
 	}
-	return provider, nil
+	defer func() {
+		_ = tarFile.Close()
+	}()
+
+	extractor, ok := format.(archives.Extractor)
+	if !ok {
+		return archiver_errors.New(archiver_errors.TarDecodeError)
+	}
+
+	var size int64
+	err = extractor.Extract(ctx, tarFile, func(ctx context.Context, fileInfo archives.FileInfo) error {
+		if ta.MaxNumberOfEntries != 0 && size >= int64(ta.MaxNumberOfEntries) {
+			return ErrTooManyEntries
+		}
+		if !fileInfo.IsDir() && !utils.PlaceHolderFolder(fileInfo.Name()) {
+			size += fileInfo.Size()
+		}
+		if size > maxBytesLimit {
+			return ErrNotEnoughSpace
+		}
+		return nil
+	})
+	return err
 }
 
-func resolveSymlinks(fileSystem fs.FS, symlinks map[string][]string) error {
-	return fs.WalkDir(fileSystem, ".", func(path string, d fs.DirEntry, err error) error {
+func resolveSymlinks(fsys fs.FS, symlinks map[string][]string) error {
+	return fs.WalkDir(fsys, ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		if isSymlink(d.Type()) {
+		if d.Type()&fs.ModeSymlink != 0 {
 			fileInfo, err := d.Info()
 			if err != nil {
 				return err
 			}
-
 			hdr, ok := fileInfo.(archives.FileInfo)
 			if !ok {
 				return nil
 			}
+			cleanedPath := strings.TrimPrefix(utils.CleanPathKeepingUnixSlash(path), "/")
 
 			var realPath string
-			cleanedPath := strings.TrimPrefix(utils.CleanPathKeepingUnixSlash(path), "/")
 			if filepath.IsAbs(hdr.LinkTarget) {
-				realPath = utils.CleanPathKeepingUnixSlash(hdr.LinkTarget)
+				realPath = filepath.ToSlash(filepath.Clean(cleanedPath))
 			} else {
 				currentDir, _ := filepath.Split(cleanedPath)
 				realPath = utils.JoinPathKeepingUnixSlash(currentDir, hdr.LinkTarget)
 			}
-
 			paths, ok := symlinks[realPath]
 			if !ok {
 				paths = []string{}
@@ -91,22 +128,20 @@ func resolveSymlinks(fileSystem fs.FS, symlinks map[string][]string) error {
 	})
 }
 
-func isSymlink(mode fs.FileMode) bool {
-	return mode&fs.ModeSymlink != 0
-}
-
-func processArchive(provider LimitAggregatingReadCloserProvider, fileSystem fs.FS, symlinks map[string][]string,
-	processingFunc func(*ArchiveHeader, map[string]interface{}) error, params map[string]interface{}) error {
-	return fs.WalkDir(fileSystem, ".", func(path string, d fs.DirEntry, err error) error {
+func processArchive(fsys fs.FS, symlinks map[string][]string, provider LimitAggregatingReadCloserProvider, processingFunc func(*ArchiveHeader, map[string]interface{}) error, params map[string]interface{}) error {
+	return fs.WalkDir(fsys, ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 		if !d.IsDir() && !utils.PlaceHolderFolder(d.Name()) {
+			if d.Type()&fs.ModeSymlink != 0 {
+				return nil
+			}
 			fileInfo, err := d.Info()
 			if err != nil {
 				return err
 			}
-			file, err := fileSystem.Open(path)
+			file, err := fsys.Open(path)
 			if err != nil {
 				return err
 			}
