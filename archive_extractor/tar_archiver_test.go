@@ -5,6 +5,7 @@ package archive_extractor
 import (
 	"fmt"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"testing"
 
 	"strings"
@@ -31,6 +32,13 @@ func TestTarArchiver(t *testing.T) {
 	assert.Equal(t, ad.ModTime, int64(1531307652))
 	assert.Equal(t, ad.IsFolder, false)
 	assert.Equal(t, ad.Size, int64(3685))
+}
+
+func TestTarArchiver_NotEnoughSpace(t *testing.T) {
+	za := &TarArchiver{MaxCompressRatio: 9999999999999}
+	funcParams := params()
+	err := za.ExtractArchive("./fixtures/test.tar.gz", processingFunc, funcParams)
+	require.NoError(t, err)
 }
 
 func TestTarArchiver_Lzma(t *testing.T) {

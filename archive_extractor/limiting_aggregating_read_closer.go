@@ -7,6 +7,7 @@ import (
 )
 
 var ErrTooManyEntries = errors.New("too many entries in archive")
+var ErrNotEnoughSpace = errors.New("not enough space in archive")
 
 type ErrCompressLimitReached struct {
 	SizeLimit int64
