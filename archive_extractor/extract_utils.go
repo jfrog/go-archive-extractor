@@ -131,9 +131,9 @@ func processArchiveAndSymlinks(ctx context.Context,
 			// we skip symlinks here because we need to process their targets
 			fileInfo.Mode().Type()&fs.ModeSymlink == 0 {
 			paths := []string{cleanedPath}
-			links, ok := symlinks[cleanedPath]
+			linkPaths, ok := symlinks[cleanedPath]
 			if ok {
-				paths = append(paths, links...)
+				paths = append(paths, linkPaths...)
 			}
 			for _, path := range paths {
 				countingReadCloser := provider.CreateLimitAggregatingReadCloser(file)
