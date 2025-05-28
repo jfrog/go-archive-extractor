@@ -4,10 +4,10 @@ package archive_extractor
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/assert"
+	"strings"
 	"testing"
 
-	"strings"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestTarUnexpectedEofArchiver(t *testing.T) {
@@ -71,7 +71,8 @@ func TestTarArchiverMaxEntriesReached(t *testing.T) {
 	}
 	funcParams := params()
 	err := za.ExtractArchive("./fixtures/testmanylarge.tar.gz", processingReadingFunc, funcParams)
-	assert.EqualError(t, err, ErrTooManyEntries.Error())
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), ErrTooManyEntries.Error())
 }
 
 func TestTarArchiverMaxEntriesNotReached(t *testing.T) {

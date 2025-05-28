@@ -4,13 +4,14 @@ import (
 	"context"
 	"io"
 	"io/fs"
-	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/jfrog/go-archive-extractor/archive_extractor/archiver_errors"
-	"github.com/jfrog/go-archive-extractor/utils"
 	"github.com/mholt/archives"
+
+	"github.com/jfrog/go-archive-extractor/archive_extractor/archiver_errors"
+	"github.com/jfrog/go-archive-extractor/compression"
+	"github.com/jfrog/go-archive-extractor/utils"
 )
 
 type processingArchiveFunc func(*ArchiveHeader, map[string]interface{}) error
@@ -48,25 +49,36 @@ func extract(ctx context.Context, ex archives.Extractor, arcReader io.Reader, Ma
 	return err
 }
 
-func extractWithSymlinks(ctx context.Context, ex archives.Extractor, path string, MaxNumberOfEntries int, provider LimitAggregatingReadCloserProvider, processingFunc processingArchiveFunc, params map[string]any) error {
-	arcReader, err := os.Open(path)
-	if err != nil {
-		return archiver_errors.NewOpenError(path, err)
+func extractWithSymlinks(ctx context.Context, path string, MaxNumberOfEntries int, provider LimitAggregatingReadCloserProvider, processingFunc processingArchiveFunc, params map[string]any) error {
+	arcSymLincReader, _, err := compression.NewReader(path)
+	if compression.IsGetReaderError(err) {
+		return archiver_errors.New(err)
 	}
-	defer func() {
-		_ = arcReader.Close()
-	}()
-
-	symlinks := make(map[string][]string)
-	if err = resolveSymlinks(ctx, ex, arcReader, MaxNumberOfEntries, symlinks); err != nil {
+	if err != nil {
 		return err
 	}
+	defer func() {
+		arcSymLincReader.Close()
+	}()
 
-	if _, err = arcReader.Seek(0, io.SeekStart); err != nil {
-		return archiver_errors.NewOpenError(path, err)
+	tarExtractor := archives.Tar{}
+
+	symlinks := make(map[string][]string)
+	if err = resolveSymlinks(ctx, tarExtractor, arcSymLincReader, MaxNumberOfEntries, symlinks); err != nil {
+		return err
 	}
+	arcReader, _, err := compression.NewReader(path)
+	if compression.IsGetReaderError(err) {
+		return archiver_errors.New(err)
+	}
+	if err != nil {
+		return err
+	}
+	defer func() {
+		arcReader.Close()
+	}()
 
-	return processArchiveAndSymlinks(ctx, ex, arcReader, MaxNumberOfEntries, symlinks, provider, processingFunc, params)
+	return processArchiveAndSymlinks(ctx, tarExtractor, arcReader, MaxNumberOfEntries, symlinks, provider, processingFunc, params)
 }
 
 func resolveSymlinks(ctx context.Context,
