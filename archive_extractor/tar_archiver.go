@@ -2,8 +2,6 @@ package archive_extractor
 
 import (
 	"context"
-
-	"github.com/jfrog/go-archive-extractor/archive_extractor/archiver_errors"
 )
 
 type TarArchiver struct {
@@ -15,7 +13,7 @@ func (ta TarArchiver) ExtractArchive(path string, processingFunc func(*ArchiveHe
 	ctx := context.Background()
 	maxBytesLimit, err := maxBytesLimit(path, ta.MaxCompressRatio)
 	if err != nil {
-		return archiver_errors.New(err)
+		return err
 	}
 	provider := LimitAggregatingReadCloserProvider{
 		Limit: maxBytesLimit,
