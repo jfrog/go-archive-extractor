@@ -9,6 +9,7 @@ import (
 	"compress/zlib"
 	"errors"
 	"github.com/klauspost/compress/zstd"
+	"github.com/mholt/archives"
 	"github.com/ulikunitz/xz"
 	"github.com/ulikunitz/xz/lzma"
 	"io"
@@ -30,6 +31,7 @@ const (
 	lzmaExt  = ".lzma"
 	tlzmaExt = ".tlzma"
 	zstdExt  = ".zst"
+	lzipExt  = ".lz"
 
 	maxMagicBytes = 6 // 6 is the biggest used here (xz)
 )
@@ -40,6 +42,7 @@ var (
 	xzMagic   = []byte{0xFD, 0x37, 0x7A, 0x58, 0x5A, 0x00}
 	lzmaMagic = []byte{0x5D, 0x00, 0x00}
 	zstdMagic = []byte{0x28, 0xB5, 0x2F, 0xFD}
+	lzipMagic = []byte{0x4C, 0x5A, 0x49, 0x50} // "LZIP"
 )
 
 func NewReaderSkipBytes(filePath string, skip int64) (io.ReadCloser, bool, error) {
@@ -84,6 +87,9 @@ func newReader(fa *fileArgs) (reader io.ReadCloser, isCompressed bool, err error
 	case zlibExt:
 		reader, err = initReader(fa, zlibReader)
 		return
+	case lzipExt:
+		reader, err = initReader(fa, lzipReader)
+		return
 	}
 	// if possible init by magic bytes
 	if magic, magicErr := getMagicBytes(fa); magicErr == nil {
@@ -99,6 +105,9 @@ func newReader(fa *fileArgs) (reader io.ReadCloser, isCompressed bool, err error
 			return
 		case bytes.HasPrefix(magic, lzmaMagic):
 			reader, err = initReader(fa, lzmaReader)
+			return
+		case bytes.HasPrefix(magic, lzipMagic):
+			reader, err = initReader(fa, lzipReader)
 			return
 		case bytes.HasPrefix(magic, zstdMagic):
 			reader, err = initReader(fa, zstdReader)
@@ -231,6 +240,14 @@ func lzmaReader(reader io.Reader) (io.ReadCloser, error) {
 		return nil, err
 	}
 	return ioutil.NopCloser(r), nil
+}
+
+func lzipReader(reader io.Reader) (io.ReadCloser, error) {
+	r, err := archives.Lzip{}.OpenReader(reader)
+	if err != nil {
+		return nil, err
+	}
+	return io.NopCloser(r), nil
 }
 
 func zstdReader(reader io.Reader) (io.ReadCloser, error) {
