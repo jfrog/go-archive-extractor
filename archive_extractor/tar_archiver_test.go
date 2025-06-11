@@ -92,3 +92,16 @@ func TestTarArchiverAggregationCauseRatioLimitError(t *testing.T) {
 	err := za.ExtractArchive("./fixtures/testmanylarge.tar.gz", processingReadingFunc, funcParams)
 	assert.True(t, IsErrCompressLimitReached(err))
 }
+
+func TestTarArchiver_TarLz(t *testing.T) {
+	za := &TarArchiver{}
+	funcParams := params()
+	if err := za.ExtractArchive("./fixtures/archive.tar.lz", processingFunc, funcParams); err != nil {
+		fmt.Print(err.Error())
+		t.Fatal(err)
+	}
+	ad := funcParams["archiveData"].(*ArchiveData)
+	assert.Equal(t, ad.Name, "archive/commons-cli-1.2.jar")
+	assert.Equal(t, ad.IsFolder, false)
+	assert.Equal(t, ad.Size, int64(41123))
+}
