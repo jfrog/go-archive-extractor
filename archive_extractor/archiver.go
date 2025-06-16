@@ -27,6 +27,7 @@ func maxBytesLimit(path string, maxCompressRation int64) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
+	defer f.Close() // close the file without handling a possible error
 	fi, err := f.Stat()
 	if err != nil {
 		return 0, err
