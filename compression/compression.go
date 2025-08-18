@@ -8,14 +8,15 @@ import (
 	"compress/lzw"
 	"compress/zlib"
 	"errors"
-	"github.com/klauspost/compress/zstd"
-	"github.com/mholt/archives"
-	"github.com/ulikunitz/xz"
-	"github.com/ulikunitz/xz/lzma"
 	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+
+	"github.com/klauspost/compress/zstd"
+	"github.com/mholt/archives"
+	"github.com/ulikunitz/xz"
+	"github.com/ulikunitz/xz/lzma"
 )
 
 const (
@@ -251,7 +252,7 @@ func lzipReader(reader io.Reader) (io.ReadCloser, error) {
 }
 
 func zstdReader(reader io.Reader) (io.ReadCloser, error) {
-	r, err := zstd.NewReader(reader)
+	r, err := zstd.NewReader(reader, zstd.WithDecoderConcurrency(1))
 	if err != nil {
 		return nil, err
 	}
