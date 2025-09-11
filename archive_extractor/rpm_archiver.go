@@ -1,12 +1,14 @@
 package archive_extractor
 
 import (
-	"github.com/cavaliercoder/go-cpio"
-	"github.com/jfrog/go-archive-extractor/archive_extractor/archiver_errors"
-	"github.com/jfrog/go-archive-extractor/compression"
-	"github.com/jfrog/go-rpm/v2"
 	"io"
 	"math"
+
+	"github.com/cavaliercoder/go-cpio"
+	"github.com/jfrog/go-rpm/v2"
+
+	"github.com/jfrog/go-archive-extractor/archive_extractor/archiver_errors"
+	"github.com/jfrog/go-archive-extractor/compression"
 )
 
 type RpmArchiver struct {
@@ -26,7 +28,7 @@ func (ra RpmArchiver) ExtractArchive(path string,
 	}
 
 	headerEnd := ra.getHeadersEnd(rpmFile.Headers)
-	cReader, _, err := compression.NewReaderSkipBytes(path, headerEnd)
+	cReader, _, err := compression.NewReader(path, compression.WithSkipBytes(headerEnd))
 	if err != nil {
 		return archiver_errors.New(err)
 	}

@@ -1,6 +1,7 @@
 package compression
 
 import (
+	"bufio"
 	"bytes"
 	"compress/bzip2"
 	"compress/flate"
@@ -9,13 +10,11 @@ import (
 	"compress/zlib"
 	"errors"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
 	"github.com/klauspost/compress/zstd"
 	"github.com/mholt/archives"
-	"github.com/ulikunitz/xz"
 	"github.com/ulikunitz/xz/lzma"
 )
 
@@ -46,12 +45,33 @@ var (
 	lzipMagic = []byte{0x4C, 0x5A, 0x49, 0x50} // "LZIP"
 )
 
-func NewReaderSkipBytes(filePath string, skip int64) (io.ReadCloser, bool, error) {
-	return newReader(&fileArgs{path: filePath, skipBytes: skip})
+const defaultBufSize = 32 * 1024
+
+type readerConfiguration struct {
+	BufSize   int
+	SkipBytes int64
 }
 
-func NewReader(filePath string) (io.ReadCloser, bool, error) {
-	return newReader(&fileArgs{path: filePath})
+type Option func(*readerConfiguration)
+
+func WithSkipBytes(skipBytes int64) Option {
+	return func(c *readerConfiguration) {
+		c.SkipBytes = skipBytes
+	}
+}
+
+func WithBufSize(size int) Option {
+	return func(c *readerConfiguration) {
+		c.BufSize = size
+	}
+}
+
+func NewReader(filePath string, options ...Option) (io.ReadCloser, bool, error) {
+	config := &readerConfiguration{BufSize: defaultBufSize, SkipBytes: 0}
+	for _, option := range options {
+		option(config)
+	}
+	return newReader(&fileArgs{path: filePath, skipBytes: config.SkipBytes}, config)
 }
 
 type fileArgs struct {
@@ -74,68 +94,68 @@ func (fa *fileArgs) open() (*os.File, error) {
 	return f, nil
 }
 
-func newReader(fa *fileArgs) (reader io.ReadCloser, isCompressed bool, err error) {
+func newReader(fa *fileArgs, conf *readerConfiguration) (reader io.ReadCloser, isCompressed bool, err error) {
 	isCompressed = true
 	ext := filepath.Ext(fa.path)
 	//these types has no defined magic bytes
 	switch ext {
 	case lzwExt:
-		reader, err = initReader(fa, lzwReader)
+		reader, err = initReader(fa, conf, lzwReader)
 		return
 	case inflExt:
-		reader, err = initReader(fa, flateReader)
+		reader, err = initReader(fa, conf, flateReader)
 		return
 	case zlibExt:
-		reader, err = initReader(fa, zlibReader)
+		reader, err = initReader(fa, conf, zlibReader)
 		return
 	case lzipExt:
-		reader, err = initReader(fa, lzipReader)
+		reader, err = initReader(fa, conf, lzipReader)
 		return
 	}
 	// if possible init by magic bytes
 	if magic, magicErr := getMagicBytes(fa); magicErr == nil {
 		switch {
 		case bytes.HasPrefix(magic, bz2Magic):
-			reader, err = initReader(fa, bz2Reader)
+			reader, err = initReader(fa, conf, bz2Reader)
 			return
 		case bytes.HasPrefix(magic, gzipMagic):
-			reader, err = initReader(fa, gzipReader)
+			reader, err = initReader(fa, conf, gzipReader)
 			return
 		case bytes.HasPrefix(magic, xzMagic):
-			reader, err = initReader(fa, xzReader)
+			reader, err = initReader(fa, conf, xzReader)
 			return
 		case bytes.HasPrefix(magic, lzmaMagic):
-			reader, err = initReader(fa, lzmaReader)
+			reader, err = initReader(fa, conf, lzmaReader)
 			return
 		case bytes.HasPrefix(magic, lzipMagic):
-			reader, err = initReader(fa, lzipReader)
+			reader, err = initReader(fa, conf, lzipReader)
 			return
 		case bytes.HasPrefix(magic, zstdMagic):
-			reader, err = initReader(fa, zstdReader)
+			reader, err = initReader(fa, conf, zstdReader)
 			return
 		}
 	}
 	// fallback to init by extension
 	switch ext {
 	case bz2Ext, tbz2Ext:
-		reader, err = initReader(fa, bz2Reader)
+		reader, err = initReader(fa, conf, bz2Reader)
 		return
 	case gzExt, tgzExt:
-		reader, err = initReader(fa, gzipReader)
+		reader, err = initReader(fa, conf, gzipReader)
 		return
 	case xzExt, txzExt:
-		reader, err = initReader(fa, xzReader)
+		reader, err = initReader(fa, conf, xzReader)
 		return
 	case lzmaExt, tlzmaExt:
-		reader, err = initReader(fa, lzmaReader)
+		reader, err = initReader(fa, conf, lzmaReader)
 		return
 	case zstdExt:
-		reader, err = initReader(fa, zstdReader)
+		reader, err = initReader(fa, conf, zstdReader)
 		return
 	default:
 		// no compression format found
 		isCompressed = false
-		reader, err = initReader(fa, fileReader)
+		reader, err = initReader(fa, conf, fileReader)
 		return
 	}
 }
@@ -175,13 +195,13 @@ func (cr *cReader) Close() error {
 	return nil
 }
 
-func initReader(fa *fileArgs, getReader func(io.Reader) (io.ReadCloser, error)) (io.ReadCloser, error) {
+func initReader(fa *fileArgs, conf *readerConfiguration, getReader func(io.Reader) (io.ReadCloser, error)) (io.ReadCloser, error) {
 
 	f, err := fa.open()
 	if err != nil {
 		return nil, err
 	}
-	r, err := getReader(f)
+	r, err := getReader(bufio.NewReaderSize(f, conf.BufSize))
 	if err != nil {
 		f.Close()
 		return nil, &ErrGetReader{err}
@@ -208,7 +228,7 @@ func IsGetReaderError(err error) bool {
 }
 
 func bz2Reader(reader io.Reader) (io.ReadCloser, error) {
-	return ioutil.NopCloser(bzip2.NewReader(reader)), nil
+	return io.NopCloser(bzip2.NewReader(reader)), nil
 }
 
 func flateReader(reader io.Reader) (io.ReadCloser, error) {
@@ -228,11 +248,11 @@ func zlibReader(reader io.Reader) (io.ReadCloser, error) {
 }
 
 func xzReader(reader io.Reader) (io.ReadCloser, error) {
-	r, err := xz.NewReader(reader)
+	r, err := archives.Xz{}.OpenReader(reader)
 	if err != nil {
 		return nil, err
 	}
-	return ioutil.NopCloser(r), nil
+	return io.NopCloser(r), nil
 }
 
 func lzmaReader(reader io.Reader) (io.ReadCloser, error) {
@@ -240,7 +260,7 @@ func lzmaReader(reader io.Reader) (io.ReadCloser, error) {
 	if err != nil {
 		return nil, err
 	}
-	return ioutil.NopCloser(r), nil
+	return io.NopCloser(r), nil
 }
 
 func lzipReader(reader io.Reader) (io.ReadCloser, error) {
@@ -256,9 +276,9 @@ func zstdReader(reader io.Reader) (io.ReadCloser, error) {
 	if err != nil {
 		return nil, err
 	}
-	return ioutil.NopCloser(r), nil
+	return io.NopCloser(r), nil
 }
 
 func fileReader(reader io.Reader) (io.ReadCloser, error) {
-	return ioutil.NopCloser(reader), nil
+	return io.NopCloser(reader), nil
 }
