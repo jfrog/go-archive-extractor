@@ -9,7 +9,7 @@ require (
 	github.com/klauspost/compress v1.17.11
 	github.com/mholt/archives v0.1.0
 	github.com/stretchr/testify v1.10.0
-	github.com/ulikunitz/xz v0.5.12
+	github.com/ulikunitz/xz v0.5.15
 )
 
 require (
