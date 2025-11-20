@@ -1,6 +1,6 @@
 module github.com/jfrog/go-archive-extractor
 
-go 1.23.0
+go 1.24.0
 
 require (
 	github.com/blakesmith/ar v0.0.0-20190502131153-809d4375e1fb
@@ -31,7 +31,7 @@ require (
 	github.com/sorairolake/lzip-go v0.3.5 // indirect
 	github.com/therootcompany/xz v1.0.1 // indirect
 	go4.org v0.0.0-20230225012048-214862532bf5 // indirect
-	golang.org/x/crypto v0.32.0 // indirect
-	golang.org/x/text v0.22.0 // indirect
+	golang.org/x/crypto v0.45.0 // indirect
+	golang.org/x/text v0.31.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
