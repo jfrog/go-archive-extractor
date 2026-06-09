@@ -33,6 +33,25 @@ func TestTarArchiver(t *testing.T) {
 	assert.Equal(t, ad.Size, int64(3685))
 }
 
+func TestTarArchiver_EmptySymlinksMapInParams(t *testing.T) {
+	za := &TarArchiver{}
+	funcParams := params()
+	funcParams[ParamSymlinksMap] = map[string][]string{}
+
+	assert.NotNil(t, symlinksInputFromParams(funcParams))
+	assert.Empty(t, symlinksInputFromParams(funcParams))
+
+	if err := za.ExtractArchive("./fixtures/test.tar.gz", processingFunc, funcParams); err != nil {
+		fmt.Print(err.Error())
+		t.Fatal(err)
+	}
+	ad := funcParams["archiveData"].(*ArchiveData)
+	assert.Equal(t, "logRotator-1.0/log_rotator.go", ad.Name)
+	assert.Equal(t, int64(1531307652), ad.ModTime)
+	assert.False(t, ad.IsFolder)
+	assert.Equal(t, int64(3685), ad.Size)
+}
+
 func TestTarArchiver_Lzma(t *testing.T) {
 	za := &TarArchiver{}
 	funcParams := params()
@@ -104,4 +123,21 @@ func TestTarArchiver_TarLz(t *testing.T) {
 	assert.Equal(t, ad.Name, "archive/commons-cli-1.2.jar")
 	assert.Equal(t, ad.IsFolder, false)
 	assert.Equal(t, ad.Size, int64(41123))
+}
+
+func TestSymlinksInputFromParams(t *testing.T) {
+	t.Parallel()
+
+	assert.Nil(t, symlinksInputFromParams(nil))
+	assert.Nil(t, symlinksInputFromParams(map[string]any{}))
+
+	withEmpty := map[string]any{ParamSymlinksMap: map[string][]string{}}
+	assert.NotNil(t, symlinksInputFromParams(withEmpty))
+	assert.Empty(t, symlinksInputFromParams(withEmpty))
+
+	withLinks := map[string]any{ParamSymlinksMap: map[string][]string{"target": {"link"}}}
+	assert.Equal(t, map[string][]string{"target": {"link"}}, symlinksInputFromParams(withLinks))
+
+	assert.Nil(t, symlinksInputFromParams(map[string]any{ParamSymlinksMap: "not-a-map"}))
+	assert.Nil(t, symlinksInputFromParams(map[string]any{ParamSymlinksMap: nil}))
 }

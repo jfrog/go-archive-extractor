@@ -18,5 +18,6 @@ func (ta TarArchiver) ExtractArchive(path string, processingFunc func(*ArchiveHe
 	provider := LimitAggregatingReadCloserProvider{
 		Limit: maxBytesLimit,
 	}
+
 	return extractWithSymlinks(ctx, path, ta.MaxNumberOfEntries, provider, processingFunc, params)
 }

@@ -16,6 +16,25 @@ import (
 
 type processingArchiveFunc func(*ArchiveHeader, map[string]interface{}) error
 
+// ParamSymlinksMap in params: when the key is absent, resolveSymlinks runs; when the key is
+// present (including an empty map), symlink resolution is skipped and the map[string][]string is used.
+const ParamSymlinksMap = "symlinks_map"
+
+func symlinksInputFromParams(params map[string]any) map[string][]string {
+	if params == nil {
+		return nil
+	}
+	raw, ok := params[ParamSymlinksMap]
+	if !ok {
+		return nil
+	}
+	m, ok := raw.(map[string][]string)
+	if !ok {
+		return nil
+	}
+	return m
+}
+
 func extract(ctx context.Context, ex archives.Extractor, arcReader io.Reader, MaxNumberOfEntries int, provider LimitAggregatingReadCloserProvider, processingFunc processingArchiveFunc, params map[string]any) error {
 	entriesCount := 0
 	var multiErrors *archiver_errors.MultiError
@@ -50,23 +69,30 @@ func extract(ctx context.Context, ex archives.Extractor, arcReader io.Reader, Ma
 }
 
 func extractWithSymlinks(ctx context.Context, path string, MaxNumberOfEntries int, provider LimitAggregatingReadCloserProvider, processingFunc processingArchiveFunc, params map[string]any) error {
-	arcSymLincReader, _, err := compression.NewReader(path)
-	if compression.IsGetReaderError(err) {
-		return archiver_errors.New(err)
-	}
-	if err != nil {
-		return err
-	}
-	defer func() {
-		arcSymLincReader.Close()
-	}()
-
 	tarExtractor := archives.Tar{}
 
-	symlinks := make(map[string][]string)
-	if err = resolveSymlinks(ctx, tarExtractor, arcSymLincReader, MaxNumberOfEntries, symlinks); err != nil {
-		return err
+	symlinksInput := symlinksInputFromParams(params)
+	var symlinks map[string][]string
+	if symlinksInput == nil {
+		arcSymLincReader, _, err := compression.NewReader(path)
+		if compression.IsGetReaderError(err) {
+			return archiver_errors.New(err)
+		}
+		if err != nil {
+			return err
+		}
+		defer func() {
+			arcSymLincReader.Close()
+		}()
+
+		symlinks = make(map[string][]string)
+		if err = resolveSymlinks(ctx, tarExtractor, arcSymLincReader, MaxNumberOfEntries, symlinks); err != nil {
+			return err
+		}
+	} else {
+		symlinks = symlinksInput
 	}
+
 	arcReader, _, err := compression.NewReader(path)
 	if compression.IsGetReaderError(err) {
 		return archiver_errors.New(err)
