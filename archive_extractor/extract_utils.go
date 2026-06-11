@@ -16,8 +16,9 @@ import (
 
 type processingArchiveFunc func(*ArchiveHeader, map[string]interface{}) error
 
-// ParamSymlinksMap in params: when the key is absent, resolveSymlinks runs; when the key is
-// present (including an empty map), symlink resolution is skipped and the map[string][]string is used.
+// ParamSymlinksMap in params: when the key is absent or the value is nil, resolveSymlinks runs.
+// When the key is present with a non-nil map (including an empty map), symlink resolution is
+// skipped and that map is used — empty means a scan ran and found no symlinks.
 const ParamSymlinksMap = "symlinks_map"
 
 func symlinksInputFromParams(params map[string]any) map[string][]string {
