@@ -33,15 +33,26 @@ func TestTarArchiver(t *testing.T) {
 	assert.Equal(t, ad.Size, int64(3685))
 }
 
-func TestTarArchiver_EmptySymlinksMapInParams(t *testing.T) {
+func TestTarArchiver_NoSymlinksResolvingOption(t *testing.T) {
 	za := &TarArchiver{}
 	funcParams := params()
-	funcParams[ParamSymlinksMap] = map[string][]string{}
 
-	assert.NotNil(t, symlinksInputFromParams(funcParams))
-	assert.Empty(t, symlinksInputFromParams(funcParams))
+	if err := za.ExtractArchiveWithOptions("./fixtures/test.tar.gz", processingFunc, funcParams, WithNoSymlinksResolving()); err != nil {
+		fmt.Print(err.Error())
+		t.Fatal(err)
+	}
+	ad := funcParams["archiveData"].(*ArchiveData)
+	assert.Equal(t, "logRotator-1.0/log_rotator.go", ad.Name)
+	assert.Equal(t, int64(1531307652), ad.ModTime)
+	assert.False(t, ad.IsFolder)
+	assert.Equal(t, int64(3685), ad.Size)
+}
 
-	if err := za.ExtractArchive("./fixtures/test.tar.gz", processingFunc, funcParams); err != nil {
+func TestTarArchiver_ResolvedSymlinksOption(t *testing.T) {
+	za := &TarArchiver{}
+	funcParams := params()
+
+	if err := za.ExtractArchiveWithOptions("./fixtures/test.tar.gz", processingFunc, funcParams, WithResolvedSymlinks(SymLinksMap{})); err != nil {
 		fmt.Print(err.Error())
 		t.Fatal(err)
 	}
@@ -125,19 +136,32 @@ func TestTarArchiver_TarLz(t *testing.T) {
 	assert.Equal(t, ad.Size, int64(41123))
 }
 
-func TestSymlinksInputFromParams(t *testing.T) {
+func TestExtractOptions(t *testing.T) {
 	t.Parallel()
 
-	assert.Nil(t, symlinksInputFromParams(nil))
-	assert.Nil(t, symlinksInputFromParams(map[string]any{}))
+	noResolveOpts, err := applyExtractOptions([]ExtractOption{WithNoSymlinksResolving()})
+	assert.NoError(t, err)
+	assert.True(t, noResolveOpts.noSymlinksResolving)
+	assert.False(t, noResolveOpts.withResolvedSymlinks)
 
-	withEmpty := map[string]any{ParamSymlinksMap: map[string][]string{}}
-	assert.NotNil(t, symlinksInputFromParams(withEmpty))
-	assert.Empty(t, symlinksInputFromParams(withEmpty))
+	withLinksOpts, err := applyExtractOptions([]ExtractOption{WithResolvedSymlinks(SymLinksMap{"target": {"link"}})})
+	assert.NoError(t, err)
+	assert.True(t, withLinksOpts.withResolvedSymlinks)
+	assert.Equal(t, SymLinksMap{"target": {"link"}}, withLinksOpts.symLinksMap)
 
-	withLinks := map[string]any{ParamSymlinksMap: map[string][]string{"target": {"link"}}}
-	assert.Equal(t, map[string][]string{"target": {"link"}}, symlinksInputFromParams(withLinks))
+	emptyMapOpts, err := applyExtractOptions([]ExtractOption{WithResolvedSymlinks(SymLinksMap{})})
+	assert.NoError(t, err)
+	assert.True(t, emptyMapOpts.withResolvedSymlinks)
+	assert.Empty(t, emptyMapOpts.symLinksMap)
 
-	assert.Nil(t, symlinksInputFromParams(map[string]any{ParamSymlinksMap: "not-a-map"}))
-	assert.Nil(t, symlinksInputFromParams(map[string]any{ParamSymlinksMap: nil}))
+	noOptions, err := applyExtractOptions(nil)
+	assert.NoError(t, err)
+	assert.False(t, noOptions.noSymlinksResolving)
+	assert.False(t, noOptions.withResolvedSymlinks)
+
+	_, err = applyExtractOptions([]ExtractOption{WithResolvedSymlinks(nil)})
+	assert.ErrorIs(t, err, ErrResolvedSymlinksMapRequired)
+
+	_, err = applyExtractOptions([]ExtractOption{WithNoSymlinksResolving(), WithResolvedSymlinks(SymLinksMap{})})
+	assert.ErrorIs(t, err, ErrConflictingSymlinksOptions)
 }

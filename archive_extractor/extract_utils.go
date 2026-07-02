@@ -2,6 +2,7 @@ package archive_extractor
 
 import (
 	"context"
+	"errors"
 	"io"
 	"io/fs"
 	"path/filepath"
@@ -16,24 +17,51 @@ import (
 
 type processingArchiveFunc func(*ArchiveHeader, map[string]interface{}) error
 
-// ParamSymlinksMap in params: when the key is absent or the value is nil, resolveSymlinks runs.
-// When the key is present with a non-nil map (including an empty map), symlink resolution is
-// skipped and that map is used — empty means a scan ran and found no symlinks.
-const ParamSymlinksMap = "symlinks_map"
+// SymLinksMap maps a symlink target path to the symlink paths that point to it.
+type SymLinksMap map[string][]string
 
-func symlinksInputFromParams(params map[string]any) map[string][]string {
-	if params == nil {
-		return nil
+var (
+	ErrConflictingSymlinksOptions  = errors.New("noSymlinksResolving and withResolvedSymlinks cannot be used together")
+	ErrResolvedSymlinksMapRequired = errors.New("symLinksMap is required when withResolvedSymlinks is set")
+)
+
+type extractOptions struct {
+	noSymlinksResolving  bool
+	withResolvedSymlinks bool
+	symLinksMap          SymLinksMap
+}
+
+// ExtractOption configures tar extraction with symlinks.
+type ExtractOption func(*extractOptions)
+
+// WithNoSymlinksResolving skips symlink resolution and processes entries without symlink aliases.
+func WithNoSymlinksResolving() ExtractOption {
+	return func(o *extractOptions) {
+		o.noSymlinksResolving = true
 	}
-	raw, ok := params[ParamSymlinksMap]
-	if !ok {
-		return nil
+}
+
+// WithResolvedSymlinks skips symlink resolution and uses a pre-resolved symlinks map.
+// The map must be non-nil (an empty map is valid).
+func WithResolvedSymlinks(m SymLinksMap) ExtractOption {
+	return func(o *extractOptions) {
+		o.withResolvedSymlinks = true
+		o.symLinksMap = m
 	}
-	m, ok := raw.(map[string][]string)
-	if !ok {
-		return nil
+}
+
+func applyExtractOptions(options []ExtractOption) (extractOptions, error) {
+	opts := extractOptions{}
+	for _, option := range options {
+		option(&opts)
 	}
-	return m
+	if opts.noSymlinksResolving && opts.withResolvedSymlinks {
+		return extractOptions{}, ErrConflictingSymlinksOptions
+	}
+	if opts.withResolvedSymlinks && opts.symLinksMap == nil {
+		return extractOptions{}, ErrResolvedSymlinksMapRequired
+	}
+	return opts, nil
 }
 
 func extract(ctx context.Context, ex archives.Extractor, arcReader io.Reader, MaxNumberOfEntries int, provider LimitAggregatingReadCloserProvider, processingFunc processingArchiveFunc, params map[string]any) error {
@@ -69,12 +97,20 @@ func extract(ctx context.Context, ex archives.Extractor, arcReader io.Reader, Ma
 	return err
 }
 
-func extractWithSymlinks(ctx context.Context, path string, MaxNumberOfEntries int, provider LimitAggregatingReadCloserProvider, processingFunc processingArchiveFunc, params map[string]any) error {
+func extractWithSymlinks(ctx context.Context, path string, MaxNumberOfEntries int, provider LimitAggregatingReadCloserProvider, processingFunc processingArchiveFunc, params map[string]any, options ...ExtractOption) error {
+	opts, err := applyExtractOptions(options)
+	if err != nil {
+		return err
+	}
 	tarExtractor := archives.Tar{}
 
-	symlinksInput := symlinksInputFromParams(params)
-	var symlinks map[string][]string
-	if symlinksInput == nil {
+	var symlinks SymLinksMap
+	switch {
+	case opts.noSymlinksResolving:
+		symlinks = SymLinksMap{}
+	case opts.withResolvedSymlinks:
+		symlinks = opts.symLinksMap
+	default:
 		arcSymLincReader, _, err := compression.NewReader(path)
 		if compression.IsGetReaderError(err) {
 			return archiver_errors.New(err)
@@ -86,12 +122,10 @@ func extractWithSymlinks(ctx context.Context, path string, MaxNumberOfEntries in
 			arcSymLincReader.Close()
 		}()
 
-		symlinks = make(map[string][]string)
-		if err = resolveSymlinks(ctx, tarExtractor, arcSymLincReader, MaxNumberOfEntries, symlinks); err != nil {
+		symlinks = make(SymLinksMap)
+		if err = ResolveSymlinks(ctx, tarExtractor, arcSymLincReader, MaxNumberOfEntries, symlinks); err != nil {
 			return err
 		}
-	} else {
-		symlinks = symlinksInput
 	}
 
 	arcReader, _, err := compression.NewReader(path)
@@ -108,11 +142,11 @@ func extractWithSymlinks(ctx context.Context, path string, MaxNumberOfEntries in
 	return processArchiveAndSymlinks(ctx, tarExtractor, arcReader, MaxNumberOfEntries, symlinks, provider, processingFunc, params)
 }
 
-func resolveSymlinks(ctx context.Context,
+func ResolveSymlinks(ctx context.Context,
 	ex archives.Extractor,
 	arcReader io.Reader,
 	MaxNumberOfEntries int,
-	symlinks map[string][]string) error {
+	symlinks SymLinksMap) error {
 
 	entriesCount := 0
 	return ex.Extract(ctx, arcReader, func(ctx context.Context, fileInfo archives.FileInfo) error {
@@ -144,7 +178,7 @@ func processArchiveAndSymlinks(ctx context.Context,
 	ex archives.Extractor,
 	arcReader io.Reader,
 	MaxNumberOfEntries int,
-	symlinks map[string][]string,
+	symlinks SymLinksMap,
 	provider LimitAggregatingReadCloserProvider,
 	processingFunc processingArchiveFunc,
 	params map[string]any) error {
