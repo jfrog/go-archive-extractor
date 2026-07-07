@@ -139,29 +139,31 @@ func TestTarArchiver_TarLz(t *testing.T) {
 func TestExtractOptions(t *testing.T) {
 	t.Parallel()
 
-	noResolveOpts, err := applyExtractOptions([]ExtractOption{WithNoSymlinksResolving()})
+	noResolveOpts, err := applyExtractOptions(WithNoSymlinksResolving())
 	assert.NoError(t, err)
-	assert.True(t, noResolveOpts.noSymlinksResolving)
-	assert.False(t, noResolveOpts.withResolvedSymlinks)
+	assert.Equal(t, noSymlinksResolving, noResolveOpts.mode)
 
-	withLinksOpts, err := applyExtractOptions([]ExtractOption{WithResolvedSymlinks(SymLinksMap{"target": {"link"}})})
+	withLinksOpts, err := applyExtractOptions(WithResolvedSymlinks(SymLinksMap{"target": {"link"}}))
 	assert.NoError(t, err)
-	assert.True(t, withLinksOpts.withResolvedSymlinks)
+	assert.Equal(t, preResolvedSymlinks, withLinksOpts.mode)
 	assert.Equal(t, SymLinksMap{"target": {"link"}}, withLinksOpts.symLinksMap)
 
-	emptyMapOpts, err := applyExtractOptions([]ExtractOption{WithResolvedSymlinks(SymLinksMap{})})
+	emptyMapOpts, err := applyExtractOptions(WithResolvedSymlinks(SymLinksMap{}))
 	assert.NoError(t, err)
-	assert.True(t, emptyMapOpts.withResolvedSymlinks)
+	assert.Equal(t, preResolvedSymlinks, emptyMapOpts.mode)
 	assert.Empty(t, emptyMapOpts.symLinksMap)
 
-	noOptions, err := applyExtractOptions(nil)
+	noOptions, err := applyExtractOptions()
 	assert.NoError(t, err)
-	assert.False(t, noOptions.noSymlinksResolving)
-	assert.False(t, noOptions.withResolvedSymlinks)
+	assert.Equal(t, resolveSymlinks, noOptions.mode)
 
-	_, err = applyExtractOptions([]ExtractOption{WithResolvedSymlinks(nil)})
-	assert.ErrorIs(t, err, ErrResolvedSymlinksMapRequired)
+	// The last option wins, so a single mode is always in effect.
+	lastWinsOpts, err := applyExtractOptions(WithNoSymlinksResolving(), WithResolvedSymlinks(SymLinksMap{}))
+	assert.NoError(t, err)
+	assert.Equal(t, preResolvedSymlinks, lastWinsOpts.mode)
 
-	_, err = applyExtractOptions([]ExtractOption{WithNoSymlinksResolving(), WithResolvedSymlinks(SymLinksMap{})})
-	assert.ErrorIs(t, err, ErrConflictingSymlinksOptions)
+	// A nil pre-resolved map falls back to resolving symlinks from the archive.
+	fallbackOpts, err := applyExtractOptions(WithResolvedSymlinks(nil))
+	assert.NoError(t, err)
+	assert.Equal(t, resolveSymlinks, fallbackOpts.mode)
 }
