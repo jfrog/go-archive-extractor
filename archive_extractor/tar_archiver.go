@@ -10,6 +10,10 @@ type TarArchiver struct {
 }
 
 func (ta TarArchiver) ExtractArchive(path string, processingFunc func(*ArchiveHeader, map[string]interface{}) error, params map[string]interface{}) error {
+	return ta.ExtractArchiveWithOptions(path, processingFunc, params)
+}
+
+func (ta TarArchiver) ExtractArchiveWithOptions(path string, processingFunc func(*ArchiveHeader, map[string]interface{}) error, params map[string]interface{}, options ...ExtractOption) error {
 	ctx := context.Background()
 	maxBytesLimit, err := maxBytesLimit(path, ta.MaxCompressRatio)
 	if err != nil {
@@ -18,5 +22,5 @@ func (ta TarArchiver) ExtractArchive(path string, processingFunc func(*ArchiveHe
 	provider := LimitAggregatingReadCloserProvider{
 		Limit: maxBytesLimit,
 	}
-	return extractWithSymlinks(ctx, path, ta.MaxNumberOfEntries, provider, processingFunc, params)
+	return extractWithSymlinks(ctx, path, ta.MaxNumberOfEntries, provider, processingFunc, params, options...)
 }

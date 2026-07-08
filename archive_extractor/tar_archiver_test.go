@@ -33,6 +33,36 @@ func TestTarArchiver(t *testing.T) {
 	assert.Equal(t, ad.Size, int64(3685))
 }
 
+func TestTarArchiver_NoSymlinksResolvingOption(t *testing.T) {
+	za := &TarArchiver{}
+	funcParams := params()
+
+	if err := za.ExtractArchiveWithOptions("./fixtures/test.tar.gz", processingFunc, funcParams, WithNoSymlinksResolving()); err != nil {
+		fmt.Print(err.Error())
+		t.Fatal(err)
+	}
+	ad := funcParams["archiveData"].(*ArchiveData)
+	assert.Equal(t, "logRotator-1.0/log_rotator.go", ad.Name)
+	assert.Equal(t, int64(1531307652), ad.ModTime)
+	assert.False(t, ad.IsFolder)
+	assert.Equal(t, int64(3685), ad.Size)
+}
+
+func TestTarArchiver_ResolvedSymlinksOption(t *testing.T) {
+	za := &TarArchiver{}
+	funcParams := params()
+
+	if err := za.ExtractArchiveWithOptions("./fixtures/test.tar.gz", processingFunc, funcParams, WithResolvedSymlinks(SymLinksMap{})); err != nil {
+		fmt.Print(err.Error())
+		t.Fatal(err)
+	}
+	ad := funcParams["archiveData"].(*ArchiveData)
+	assert.Equal(t, "logRotator-1.0/log_rotator.go", ad.Name)
+	assert.Equal(t, int64(1531307652), ad.ModTime)
+	assert.False(t, ad.IsFolder)
+	assert.Equal(t, int64(3685), ad.Size)
+}
+
 func TestTarArchiver_Lzma(t *testing.T) {
 	za := &TarArchiver{}
 	funcParams := params()
@@ -104,4 +134,36 @@ func TestTarArchiver_TarLz(t *testing.T) {
 	assert.Equal(t, ad.Name, "archive/commons-cli-1.2.jar")
 	assert.Equal(t, ad.IsFolder, false)
 	assert.Equal(t, ad.Size, int64(41123))
+}
+
+func TestExtractOptions(t *testing.T) {
+	t.Parallel()
+
+	noResolveOpts, err := applyExtractOptions(WithNoSymlinksResolving())
+	assert.NoError(t, err)
+	assert.Equal(t, noSymlinksResolving, noResolveOpts.mode)
+
+	withLinksOpts, err := applyExtractOptions(WithResolvedSymlinks(SymLinksMap{"target": {"link"}}))
+	assert.NoError(t, err)
+	assert.Equal(t, preResolvedSymlinks, withLinksOpts.mode)
+	assert.Equal(t, SymLinksMap{"target": {"link"}}, withLinksOpts.symLinksMap)
+
+	emptyMapOpts, err := applyExtractOptions(WithResolvedSymlinks(SymLinksMap{}))
+	assert.NoError(t, err)
+	assert.Equal(t, preResolvedSymlinks, emptyMapOpts.mode)
+	assert.Empty(t, emptyMapOpts.symLinksMap)
+
+	noOptions, err := applyExtractOptions()
+	assert.NoError(t, err)
+	assert.Equal(t, resolveSymlinks, noOptions.mode)
+
+	// The last option wins, so a single mode is always in effect.
+	lastWinsOpts, err := applyExtractOptions(WithNoSymlinksResolving(), WithResolvedSymlinks(SymLinksMap{}))
+	assert.NoError(t, err)
+	assert.Equal(t, preResolvedSymlinks, lastWinsOpts.mode)
+
+	// A nil pre-resolved map falls back to resolving symlinks from the archive.
+	fallbackOpts, err := applyExtractOptions(WithResolvedSymlinks(nil))
+	assert.NoError(t, err)
+	assert.Equal(t, resolveSymlinks, fallbackOpts.mode)
 }
